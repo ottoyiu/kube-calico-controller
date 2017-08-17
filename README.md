@@ -7,7 +7,7 @@ A Kubernetes controller that ensures Kubernetes nodes and Calico's etcd datstore
 
 This Controller is unnecessary for Calico deployments where the datasource is set to Kubernetes instead of etcd. At the time of writing this README, the Kubernetes datastore driver in Calico 2.4 is still not feature parity with the etcd datastore driver which may prevent users from switching to it. This is where the controller can come in handy.
 
-[https://github.com/kubernetes/kops/issues/3224](This issue) describes the problem in detail of what this controller tries to solve.
+[This issue](https://github.com/kubernetes/kops/issues/3224) describes the problem in detail of what this controller tries to solve.
 
 ## Quick Start
 
@@ -17,7 +17,7 @@ This Controller is unnecessary for Calico deployments where the datasource is se
 - Calico >= 2.0
 
 ## Kops integration
-Integration progress can be tracked using [https://github.com/kubernetes/kops/issues/3224](this issue).
+Integration progress can be tracked using [this Issue](https://github.com/kubernetes/kops/issues/3224).
 
 ## Usage
 
