@@ -9,6 +9,8 @@ This Controller is unnecessary for Calico deployments where the datasource is se
 
 [This issue](https://github.com/kubernetes/kops/issues/3224) describes the problem in detail of what this controller tries to solve.
 
+Heavily inspired/based on this prototype by Casey Davenport: [caseydavenport/calico-node-controller](https://github.com/caseydavenport/calico-node-controller)
+
 ## Quick Start
 
 ## Requirements
