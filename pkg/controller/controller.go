@@ -1,14 +1,16 @@
 package controller
 
 import (
-	"client-go/pkg/api"
-	"client-go/tools/cache"
-	"client-go/util/workqueue"
 	"fmt"
 	"time"
 
+	"k8s.io/client-go/util/workqueue"
+
+	"k8s.io/client-go/tools/cache"
+
 	calicache "github.com/caseydavenport/calico-node-controller/pkg/cache"
 	"github.com/golang/glog"
+	"github.com/projectcalico/libcalico-go/lib/api"
 	caliclient "github.com/projectcalico/libcalico-go/lib/client"
 
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -21,15 +23,17 @@ type Controller struct {
 	informer     cache.Controller
 	calicoCache  calicache.ResourceCache
 	calicoClient *caliclient.Client
+	noOp         bool
 }
 
-func NewController(queue workqueue.RateLimitingInterface, indexer cache.Indexer, informer cache.Controller, calicoClient *caliclient.Client) *Controller {
+func NewController(queue workqueue.RateLimitingInterface, indexer cache.Indexer, informer cache.Controller, calicoClient *caliclient.Client, noOp bool) *Controller {
 	return &Controller{
 		informer:     informer,
 		indexer:      indexer,
 		queue:        queue,
 		calicoCache:  calicache.NewCache(),
-		calicoClient: caliclient,
+		calicoClient: calicoClient,
+		noOp:         noOp,
 	}
 }
 
@@ -54,25 +58,29 @@ func (c *Controller) processNextItem() bool {
 // syncToCalico syncs the given update to Calico's etcd, as well as the in-memory cache
 // of Calico objects for periodic syncs.
 func (c *Controller) syncToCalico(key string) error {
-	obj, exists, err := c.indexer.GetByKey(key)
+	_, exists, err := c.indexer.GetByKey(key)
 	if err != nil {
 		glog.Errorf("Fetching object with key %s from store failed with %v", key, err)
 		return err
 	}
 
 	if !exists {
-		glog.Infof("Node %s does not exist anymore\n... attempting to find in Calico datastore", key)
+		glog.Infof("Node %s does not exist anymore... attempting to find in Calico datastore", key)
 
 		// Check if it exists in our cache.
 		node, ok := c.calicoCache.Get(key)
 		if ok {
 			// If it does, then remove it.
-			glog.Infof("Deleting stale node from calico datastore: %s\n", key)
-			c.calicoCache.Delete(key)
-			return c.calicoClient.Nodes().Delete(node.(api.Node).Metadata)
+			glog.Infof("Deleting stale node from calico datastore: %s", key)
+			if c.noOp {
+				glog.Infof("No-op: WILL delete %s", key)
+			} else {
+				c.calicoCache.Delete(key)
+				return c.calicoClient.Nodes().Delete(node.(api.Node).Metadata)
+			}
 		}
 		// Otherwise, this is a no-op.
-		glog.Debugf("Node %s does not exist in Calico datastore... ignoring\n", key)
+		glog.Infof("Node %s does not exist in Calico datastore... ignoring", key)
 		return nil
 	}
 	return nil

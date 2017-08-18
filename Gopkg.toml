@@ -23,16 +23,20 @@
 
 [[constraint]]
   branch = "master"
+  name = "github.com/caseydavenport/calico-node-controller"
+
+[[constraint]]
+  branch = "master"
   name = "github.com/golang/glog"
 
 [[constraint]]
-  name = "k8s.io/client-go"
-  version = "4.0.0-beta.0"
+  name = "github.com/projectcalico/libcalico-go"
+  version = "1.6.0"
 
 [[constraint]]
   branch = "release-1.7"
   name = "k8s.io/apimachinery"
 
 [[constraint]]
-  name = "github.com/projectcalico/libcalico-go"
-  version = "1.6.0"
+  name = "k8s.io/client-go"
+  version = "4.0.0"

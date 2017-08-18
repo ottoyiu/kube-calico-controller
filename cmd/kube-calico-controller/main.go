@@ -12,6 +12,8 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/workqueue"
+
+	"github.com/ottoyiu/kube-calico-controller/pkg/controller"
 )
 
 // Based off of: https://github.com/kubernetes/client-go/blob/release-4.0/examples/workqueue/main.go
@@ -39,7 +41,7 @@ func main() {
 	if err != nil {
 		glog.Fatal(err)
 	}
-	calicoClient, err := caliclient.New(*cconfig)
+	calicoClient, err := caliclient.New(*calicoConfig)
 	if err != nil {
 		glog.Fatal(err)
 	}
@@ -79,7 +81,7 @@ func main() {
 		},
 	}, cache.Indexers{})
 
-	controller := NewController(queue, indexer, informer, calicoClient)
+	controller := controller.NewController(queue, indexer, informer, calicoClient, true)
 
 	// Now let's start the controller
 	stop := make(chan struct{})

@@ -1,32 +1,21 @@
 package main
 
 import (
+	"bytes"
+	"errors"
 	"log"
 	"net/http"
+	"testing"
+	"time"
 
 	"github.com/emicklei/go-restful"
 )
-
-// This example has the same service definition as restful-user-resource
-// but uses a different router (CurlyRouter) that does not use regular expressions
-//
-// POST http://localhost:8080/users
-// <User><Id>1</Id><Name>Melissa Raspberry</Name></User>
-//
-// GET http://localhost:8080/users/1
-//
-// PUT http://localhost:8080/users/1
-// <User><Id>1</Id><Name>Melissa</Name></User>
-//
-// DELETE http://localhost:8080/users/1
-//
 
 type User struct {
 	Id, Name string
 }
 
 type UserResource struct {
-	// normally one would use DAO (data access object)
 	users map[string]User
 }
 
@@ -35,7 +24,7 @@ func (u UserResource) Register(container *restful.Container) {
 	ws.
 		Path("/users").
 		Consumes(restful.MIME_XML, restful.MIME_JSON).
-		Produces(restful.MIME_JSON, restful.MIME_XML) // you can specify this per route as well
+		Produces(restful.MIME_JSON, restful.MIME_XML)
 
 	ws.Route(ws.GET("/{user-id}").To(u.findUser))
 	ws.Route(ws.POST("").To(u.updateUser))
@@ -45,7 +34,7 @@ func (u UserResource) Register(container *restful.Container) {
 	container.Add(ws)
 }
 
-// GET http://localhost:8080/users/1
+// GET http://localhost:8090/users/1
 //
 func (u UserResource) findUser(request *restful.Request, response *restful.Response) {
 	id := request.PathParameter("user-id")
@@ -58,7 +47,7 @@ func (u UserResource) findUser(request *restful.Request, response *restful.Respo
 	}
 }
 
-// POST http://localhost:8080/users
+// POST http://localhost:8090/users
 // <User><Id>1</Id><Name>Melissa Raspberry</Name></User>
 //
 func (u *UserResource) updateUser(request *restful.Request, response *restful.Response) {
@@ -73,7 +62,7 @@ func (u *UserResource) updateUser(request *restful.Request, response *restful.Re
 	}
 }
 
-// PUT http://localhost:8080/users/1
+// PUT http://localhost:8090/users/1
 // <User><Id>1</Id><Name>Melissa</Name></User>
 //
 func (u *UserResource) createUser(request *restful.Request, response *restful.Response) {
@@ -81,27 +70,80 @@ func (u *UserResource) createUser(request *restful.Request, response *restful.Re
 	err := request.ReadEntity(&usr)
 	if err == nil {
 		u.users[usr.Id] = usr
-		response.WriteHeaderAndEntity(http.StatusCreated, usr)
+		response.WriteHeader(http.StatusCreated)
+		response.WriteEntity(usr)
 	} else {
 		response.AddHeader("Content-Type", "text/plain")
 		response.WriteErrorString(http.StatusInternalServerError, err.Error())
 	}
 }
 
-// DELETE http://localhost:8080/users/1
+// DELETE http://localhost:8090/users/1
 //
 func (u *UserResource) removeUser(request *restful.Request, response *restful.Response) {
 	id := request.PathParameter("user-id")
 	delete(u.users, id)
 }
 
-func main() {
+func RunRestfulCurlyRouterServer() {
 	wsContainer := restful.NewContainer()
 	wsContainer.Router(restful.CurlyRouter{})
 	u := UserResource{map[string]User{}}
 	u.Register(wsContainer)
 
-	log.Print("start listening on localhost:8080")
-	server := &http.Server{Addr: ":8080", Handler: wsContainer}
+	log.Print("start listening on localhost:8090")
+	server := &http.Server{Addr: ":8090", Handler: wsContainer}
 	log.Fatal(server.ListenAndServe())
+}
+
+func waitForServerUp(serverURL string) error {
+	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
+		_, err := http.Get(serverURL + "/")
+		if err == nil {
+			return nil
+		}
+	}
+	return errors.New("waiting for server timed out")
+}
+
+func TestServer(t *testing.T) {
+	serverURL := "http://localhost:8090"
+	go func() {
+		RunRestfulCurlyRouterServer()
+	}()
+	if err := waitForServerUp(serverURL); err != nil {
+		t.Errorf("%v", err)
+	}
+
+	// GET should give a 405
+	resp, err := http.Get(serverURL + "/users/")
+	if err != nil {
+		t.Errorf("unexpected error in GET /users/: %v", err)
+	}
+	if resp.StatusCode != http.StatusMethodNotAllowed {
+		t.Errorf("unexpected response: %v, expected: %v", resp.StatusCode, http.StatusOK)
+	}
+
+	// Send a POST request.
+	var jsonStr = []byte(`{"id":"1","name":"user1"}`)
+	req, err := http.NewRequest("POST", serverURL+"/users/", bytes.NewBuffer(jsonStr))
+	req.Header.Set("Content-Type", restful.MIME_JSON)
+
+	client := &http.Client{}
+	resp, err = client.Do(req)
+	if err != nil {
+		t.Errorf("unexpected error in sending req: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("unexpected response: %v, expected: %v", resp.StatusCode, http.StatusOK)
+	}
+
+	// Test that GET works.
+	resp, err = http.Get(serverURL + "/users/1")
+	if err != nil {
+		t.Errorf("unexpected error in GET /users/1: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("unexpected response: %v, expected: %v", resp.StatusCode, http.StatusOK)
+	}
 }
