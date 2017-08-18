@@ -2,6 +2,7 @@ package controller
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"k8s.io/client-go/util/workqueue"
@@ -67,23 +68,37 @@ func (c *Controller) syncToCalico(key string) error {
 	if !exists {
 		glog.Infof("Node %s does not exist anymore... attempting to find in Calico datastore", key)
 
-		// Check if it exists in our cache.
-		node, ok := c.calicoCache.Get(key)
-		if ok {
-			// If it does, then remove it.
-			glog.Infof("Deleting stale node from calico datastore: %s", key)
-			if c.noOp {
-				glog.Infof("No-op: WILL delete %s", key)
-			} else {
-				c.calicoCache.Delete(key)
-				return c.calicoClient.Nodes().Delete(node.(api.Node).Metadata)
-			}
-		}
-		// Otherwise, this is a no-op.
-		glog.Infof("Node %s does not exist in Calico datastore... ignoring", key)
-		return nil
+		// Check if it exists in our cache and delete if so
+		return c.deleteNodeFromCalico(key, true)
+
 	}
 	return nil
+}
+
+func (c *Controller) deleteNodeFromCalico(nodeName string, useShortName bool) error {
+	// Check if it exists in our cache. Use shortname for retrieval
+	node, ok := c.calicoCache.Get(nodeName)
+	if !ok && useShortName {
+		shortName := strings.Split(nodeName, ".")[0]
+		glog.Infof("Node %s does not exist in Calico datastore... trying shortName: %s", nodeName, shortName)
+		node, ok = c.calicoCache.Get(shortName)
+	}
+	if ok {
+		// If it does, then remove it.
+		metadata := node.(api.Node).Metadata
+		glog.Infof("Deleting stale node from calico datastore: %s", metadata.Name)
+		if c.noOp {
+			glog.Infof("No-op: delete %s", metadata.Name)
+			return nil
+		} else {
+			c.calicoCache.Delete(metadata.Name)
+			return c.calicoClient.Nodes().Delete(metadata)
+		}
+	}
+	// Otherwise, this is a no-op.
+	glog.Infof("Node %s does not exist in Calico datastore... ignoring", nodeName)
+	return nil
+
 }
 
 // handleErr checks if an error happened and makes sure we will retry later.
@@ -117,6 +132,7 @@ func (c *Controller) Run(threadiness int, stopCh chan struct{}) {
 
 	// Let the workers stop when we are done
 	defer c.queue.ShutDown()
+	c.populateCalicoCache()
 	glog.Info("Starting Node controller")
 
 	go c.informer.Run(stopCh)
@@ -126,8 +142,6 @@ func (c *Controller) Run(threadiness int, stopCh chan struct{}) {
 		runtime.HandleError(fmt.Errorf("Timed out waiting for caches to sync"))
 		return
 	}
-
-	c.populateCalicoCache()
 
 	for i := 0; i < threadiness; i++ {
 		go wait.Until(c.runWorker, time.Second, stopCh)
@@ -151,5 +165,6 @@ func (c *Controller) populateCalicoCache() {
 	for _, node := range calicoNodes.Items {
 		name := node.Metadata.Name
 		c.calicoCache.Set(name, node)
+		glog.Infof("Adding Node %s to Calico datastore cache", name)
 	}
 }

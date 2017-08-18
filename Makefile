@@ -14,7 +14,6 @@ image:
 push_image:
 	docker push ${IMAGE_TAG}
 
-.PHONY: bin bin/linux/${PROJECT_NAME}
 bin: bin/linux/${PROJECT_NAME}
 
 bin/%: LDFLAGS=-X github.com/ottoyiu/${PROJECT_NAME}.Version=${VERSION}

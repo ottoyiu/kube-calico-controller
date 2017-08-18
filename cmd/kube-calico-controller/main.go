@@ -20,9 +20,11 @@ import (
 func main() {
 	var kubeconfig string
 	var master string
+	var noOp bool
 
 	flag.StringVar(&kubeconfig, "kubeconfig", "", "absolute path to the kubeconfig file")
 	flag.StringVar(&master, "master", "", "master url")
+	flag.BoolVar(&noOp, "noop", false, "dry-run mode. No changes would be made.")
 	flag.Parse()
 
 	// creates the Kubernetes connection config
@@ -81,7 +83,7 @@ func main() {
 		},
 	}, cache.Indexers{})
 
-	controller := controller.NewController(queue, indexer, informer, calicoClient, true)
+	controller := controller.NewController(queue, indexer, informer, calicoClient, noOp)
 
 	// Now let's start the controller
 	stop := make(chan struct{})
