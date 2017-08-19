@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"time"
 
 	"github.com/golang/glog"
 
@@ -20,12 +21,24 @@ import (
 func main() {
 	var kubeconfig string
 	var master string
-	var noOp bool
+	var domainName string
+	var syncSeconds int
+	var dryRun bool
 
 	flag.StringVar(&kubeconfig, "kubeconfig", "", "absolute path to the kubeconfig file")
 	flag.StringVar(&master, "master", "", "master url")
-	flag.BoolVar(&noOp, "noop", false, "dry-run mode. No changes would be made.")
+	flag.StringVar(&domainName, "domain", "", "Domain name for nodes if Calico datastore stores Nodes as shortnames.")
+	flag.IntVar(&syncSeconds, "syncperiod", 300, "Sync period between Kubernetes API and Calico datastore, in seconds.")
+	flag.BoolVar(&dryRun, "dryrun", false, "dry-run mode. No changes will be made to the Calico datastore.")
 	flag.Parse()
+
+	if dryRun {
+		glog.Info("Running in Dry-Run mode. No changes will be made to the Calico datastore.")
+	}
+	if domainName != "" {
+		glog.Infof("Appending domain name %s to short hostnames to form FQDN for nodes in Calico datastore.", domainName)
+	}
+	glog.Infof("Sync period between Kubernetes API and Calico datastore is set to: %d seconds.", syncSeconds)
 
 	// creates the Kubernetes connection config
 	config, err := clientcmd.BuildConfigFromFlags(master, kubeconfig)
@@ -60,7 +73,7 @@ func main() {
 	// whenever the cache is updated, the Node key is added to the workqueue.
 	// Note that when we finally process the item from the workqueue, we might see a newer version
 	// of the Node than the version which was responsible for triggering the update.
-	indexer, informer := cache.NewIndexerInformer(nodeListWatcher, &v1.Node{}, 0, cache.ResourceEventHandlerFuncs{
+	indexer, informer := cache.NewIndexerInformer(nodeListWatcher, &v1.Node{}, 60*time.Second, cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			key, err := cache.MetaNamespaceKeyFunc(obj)
 			if err == nil {
@@ -83,7 +96,7 @@ func main() {
 		},
 	}, cache.Indexers{})
 
-	controller := controller.NewController(queue, indexer, informer, calicoClient, noOp)
+	controller := controller.NewController(queue, indexer, informer, calicoClient, domainName, dryRun, syncSeconds)
 
 	// Now let's start the controller
 	stop := make(chan struct{})

@@ -22,5 +22,41 @@ Heavily inspired/based on this prototype by Casey Davenport: [caseydavenport/cal
 Integration progress can be tracked using [this Issue](https://github.com/kubernetes/kops/issues/3224).
 
 ## Usage
+```
+Usage of bin/linux/kube-calico-controller:
+  -alsologtostderr
+        log to standard error as well as files
+  -domain string
+        Domain name for nodes if Calico datastore stores Nodes as shortnames.
+  -dryrun
+        dry-run mode. No changes will be made to the Calico datastore.
+  -kubeconfig string
+        absolute path to the kubeconfig file
+  -log_backtrace_at value
+        when logging hits line file:N, emit a stack trace
+  -log_dir string
+        If non-empty, write log files in this directory
+  -logtostderr
+        log to standard error instead of files
+  -master string
+        master url
+  -stderrthreshold value
+        logs at or above this threshold go to stderr
+  -syncperiod int
+        Sync period between Kubernetes API and Calico datastore, in seconds. (default 300)
+  -v value
+        log level for V logs
+  -vmodule value
+        comma-separated list of pattern=N settings for file-filtered logging
+
+```
+Specifying the verbosity level of logging to 4 using the -v flag will get debug level output.
+
+You only need to specify the location to kubeconfig using the `-kubeconfig` flag if you are running the controller out of the cluster for development and testing purpose.
+
+The etcd cluster used by Calico as the datastore must be set as an environmental variable.
 
 ### Environnmental Variables
+Variable                       | Description
+------------------------------ | ----------
+`CALICO_ETCD_ENDPOINTS`        | Etcd Endpoints string (eg. "http://etcd-1.internal.cluster:4001,http://etcd-2.internal.cluster:4001,http://etcd-3.internal.cluster:4001") - *required*

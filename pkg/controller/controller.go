@@ -24,17 +24,21 @@ type Controller struct {
 	informer     cache.Controller
 	calicoCache  calicache.ResourceCache
 	calicoClient *caliclient.Client
-	noOp         bool
+	domainName   string
+	dryRun       bool
+	syncSeconds  int
 }
 
-func NewController(queue workqueue.RateLimitingInterface, indexer cache.Indexer, informer cache.Controller, calicoClient *caliclient.Client, noOp bool) *Controller {
+func NewController(queue workqueue.RateLimitingInterface, indexer cache.Indexer, informer cache.Controller, calicoClient *caliclient.Client, domainName string, dryRun bool, syncSeconds int) *Controller {
 	return &Controller{
 		informer:     informer,
 		indexer:      indexer,
 		queue:        queue,
 		calicoCache:  calicache.NewCache(),
 		calicoClient: calicoClient,
-		noOp:         noOp,
+		domainName:   domainName,
+		dryRun:       dryRun,
+		syncSeconds:  syncSeconds,
 	}
 }
 
@@ -69,7 +73,7 @@ func (c *Controller) syncToCalico(key string) error {
 		glog.Infof("Node %s does not exist anymore... attempting to find in Calico datastore", key)
 
 		// Check if it exists in our cache and delete if so
-		return c.deleteNodeFromCalico(key, true)
+		return c.deleteNodeFromCalico(key, c.domainName != "")
 
 	}
 	return nil
@@ -87,8 +91,8 @@ func (c *Controller) deleteNodeFromCalico(nodeName string, useShortName bool) er
 		// If it does, then remove it.
 		metadata := node.(api.Node).Metadata
 		glog.Infof("Deleting stale node from calico datastore: %s", metadata.Name)
-		if c.noOp {
-			glog.Infof("No-op: delete %s", metadata.Name)
+		if c.dryRun {
+			glog.Infof("Dry-run: delete %s", metadata.Name)
 			return nil
 		} else {
 			c.calicoCache.Delete(metadata.Name)
@@ -143,6 +147,8 @@ func (c *Controller) Run(threadiness int, stopCh chan struct{}) {
 		return
 	}
 
+	go c.periodicDatastoreSync()
+
 	for i := 0; i < threadiness; i++ {
 		go wait.Until(c.runWorker, time.Second, stopCh)
 	}
@@ -165,6 +171,57 @@ func (c *Controller) populateCalicoCache() {
 	for _, node := range calicoNodes.Items {
 		name := node.Metadata.Name
 		c.calicoCache.Set(name, node)
-		glog.Infof("Adding Node %s to Calico datastore cache", name)
+		glog.Infof("Reading Node %s into Calico datastore cache", name)
+	}
+}
+
+func (c *Controller) periodicDatastoreSync() {
+	glog.Info("Starting periodic resync thread")
+	for {
+		glog.Info("Performing a periodic resync")
+		c.performDatastoreSync()
+		glog.Info("Periodic resync done")
+		time.Sleep(time.Duration(c.syncSeconds) * time.Second)
+	}
+}
+
+func (c *Controller) performDatastoreSync() {
+	// First, let's bring the Calico cache in-sync with what's actually in etcd.
+	calicoNodes, err := c.calicoClient.Nodes().List(api.NodeMetadata{})
+	if err != nil {
+		panic(err)
+	}
+
+	// Build a map of existing nodes, plus a map including all keys that exist.
+	allNodeNames := map[string]bool{}
+	existing := map[string]interface{}{}
+	for _, node := range calicoNodes.Items {
+		name := node.Metadata.Name
+		existing[name] = node
+		if c.domainName != "" && !strings.Contains(name, ".") {
+			// TODO: check if domainName already starts with a period
+			name = name + "." + c.domainName
+		}
+		allNodeNames[name] = true
+	}
+
+	// Sync the in-memory cache with etcd
+	for _, name := range c.calicoCache.ListKeys() {
+		if _, ok := existing[name]; !ok {
+			// No longer in etcd - delete it from cache.
+			c.calicoCache.Delete(name)
+		} else {
+			// TODO: update the cache with new data from etcd.
+		}
+	}
+
+	// Now, send through all existing keys across both the Kubernetes API, and
+	// etcd so we can sync them if needed.
+	for _, name := range c.indexer.ListKeys() {
+		allNodeNames[name] = true
+	}
+	glog.Infof("Refreshing %d keys in total", len(allNodeNames))
+	for name, _ := range allNodeNames {
+		c.queue.Add(name)
 	}
 }
