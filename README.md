@@ -12,6 +12,7 @@ This Controller is unnecessary for Calico deployments where the datasource is se
 Heavily inspired/based on this prototype by Casey Davenport: [caseydavenport/calico-node-controller](https://github.com/caseydavenport/calico-node-controller)
 
 ## Quick Start
+To deploy this controller into your Kubernetes cluster, please make sure your cluster fufills the requirements as listed below. Then go to deploy/README.md for a quick start guide on how to deploy this to your Kubernetes cluster.
 
 ## Requirements
 - Kubernetes cluster with Calico as the network provider, using etcd as the datasource.
@@ -56,7 +57,7 @@ You only need to specify the location to kubeconfig using the `-kubeconfig` flag
 
 The etcd cluster used by Calico as the datastore must be set as an environmental variable.
 
-### Environnmental Variables
+### Environmental Variables
 Variable                       | Description
 ------------------------------ | ----------
 `CALICO_ETCD_ENDPOINTS`        | Etcd Endpoints string (eg. "http://etcd-1.internal.cluster:4001,http://etcd-2.internal.cluster:4001,http://etcd-3.internal.cluster:4001") - *required*
