@@ -18,6 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
+// Node Controller
 type Controller struct {
 	indexer      cache.Indexer
 	queue        workqueue.RateLimitingInterface
@@ -29,6 +30,7 @@ type Controller struct {
 	syncSeconds  int
 }
 
+// Create new Node Controller
 func NewController(queue workqueue.RateLimitingInterface, indexer cache.Indexer, informer cache.Controller, calicoClient *caliclient.Client, domainName string, dryRun bool, syncSeconds int) *Controller {
 	return &Controller{
 		informer:     informer,
@@ -94,10 +96,9 @@ func (c *Controller) deleteNodeFromCalico(nodeName string, useShortName bool) er
 		if c.dryRun {
 			glog.Infof("Dry-run: delete %s", metadata.Name)
 			return nil
-		} else {
-			c.calicoCache.Delete(metadata.Name)
-			return c.calicoClient.Nodes().Delete(metadata)
 		}
+		c.calicoCache.Delete(metadata.Name)
+		return c.calicoClient.Nodes().Delete(metadata)
 	}
 	// Otherwise, this is a no-op.
 	glog.Infof("Node %s does not exist in Calico datastore... ignoring", nodeName)
@@ -221,7 +222,7 @@ func (c *Controller) performDatastoreSync() {
 		allNodeNames[name] = true
 	}
 	glog.Infof("Refreshing %d keys in total", len(allNodeNames))
-	for name, _ := range allNodeNames {
+	for name := range allNodeNames {
 		c.queue.Add(name)
 	}
 }
