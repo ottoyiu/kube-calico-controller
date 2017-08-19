@@ -18,7 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
-// Node Controller
+// Controller is a Node Controller
 type Controller struct {
 	indexer      cache.Indexer
 	queue        workqueue.RateLimitingInterface
@@ -30,7 +30,7 @@ type Controller struct {
 	syncSeconds  int
 }
 
-// Create new Node Controller
+// NewController creates a new Node Controller
 func NewController(queue workqueue.RateLimitingInterface, indexer cache.Indexer, informer cache.Controller, calicoClient *caliclient.Client, domainName string, dryRun bool, syncSeconds int) *Controller {
 	return &Controller{
 		informer:     informer,
@@ -132,6 +132,7 @@ func (c *Controller) handleErr(err error, key interface{}) {
 	glog.Infof("Dropping node %q out of the queue: %v", key, err)
 }
 
+// Run controller
 func (c *Controller) Run(threadiness int, stopCh chan struct{}) {
 	defer runtime.HandleCrash()
 
