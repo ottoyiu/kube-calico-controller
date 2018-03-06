@@ -59,7 +59,7 @@ spec:
         scheduler.alpha.kubernetes.io/tolerations: '[{"key":"dedicated", "value":"master"}]'
     spec:
       containers:
-        - image: ottoyiu/kube-calico-controller:0.0.2
+        - image: ottoyiu/kube-calico-controller:0.0.3
           name: kube-calico-controller
           resources:
             limits:
