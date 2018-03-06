@@ -79,6 +79,7 @@ spec:
               mountPath: "/etc/ssl/certs/ca-certificates.crt"
               readOnly: true
           imagePullPolicy: "Always"
+      serviceAccountName: kube-calico-controller
       volumes:
         - name: ssl-certs
           hostPath:
