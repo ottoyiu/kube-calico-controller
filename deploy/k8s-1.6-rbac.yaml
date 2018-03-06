@@ -59,7 +59,7 @@ spec:
         scheduler.alpha.kubernetes.io/tolerations: '[{"key":"dedicated", "value":"master"}]'
     spec:
       containers:
-        - image: ottoyiu/kube-calico-controller:0.0.2
+        - image: ottoyiu/kube-calico-controller:0.0.3
           name: kube-calico-controller
           resources:
             limits:
@@ -79,6 +79,7 @@ spec:
               mountPath: "/etc/ssl/certs/ca-certificates.crt"
               readOnly: true
           imagePullPolicy: "Always"
+      serviceAccountName: kube-calico-controller
       volumes:
         - name: ssl-certs
           hostPath:
